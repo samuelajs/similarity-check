@@ -1651,7 +1651,14 @@
     const manualExteriorRoomIds = rooms.filter((r) => r.manualExterior).map((r) => r.id);
     const exteriorSegs = detectExteriorSegments(axialLinesArr, segments, silhouettePoints, manualExteriorRoomIds, roomToSegments);
     if (exteriorSegs.size === 0) {
-      return { ok: false, reason: "belum ada ruang/garis aksial yang terhubung ke luar bangunan (tandai manual lewat ikon pintu-keluar di daftar ruang, atau gambar garis aksial yang menembus siluet)" };
+      // A room marked as exterior-access only counts once some axial segment actually
+      // passes through it (the Exterior node is wired to SEGMENTS, not rooms) -- say so
+      // explicitly, otherwise a user who already marked rooms is told to mark them again.
+      const marked = rooms.filter((r) => r.manualExterior).map((r) => r.name || "(tanpa nama)");
+      if (marked.length) {
+        return { ok: false, reason: "ruang " + marked.join(", ") + " sudah ditandai punya akses ke luar, tapi belum ada garis aksial yang melewati ruang itu -- tarik minimal satu garis aksial melewatinya (atau gambar garis aksial yang menembus siluet)" };
+      }
+      return { ok: false, reason: "belum ada ruang/garis aksial yang terhubung ke luar bangunan (tandai manual lewat ikon pintu-keluar di daftar ruang atau klik ganda ruangnya dengan tool Peta Aksial, atau gambar garis aksial yang menembus siluet)" };
     }
     const adjExt = withExteriorNode(adj, exteriorSegs);
     const nodeIds = [...segments.map((s) => s.id), "__EXTERIOR__"];
@@ -2419,7 +2426,7 @@
       function tick() {
         if (currentTool !== "axial") { axialAntsRAF = null; return; } // self-stopping once the tool changes
         axialAntsOffset = (axialAntsOffset + 0.4) % 10000;
-        renderCanvasOnly();
+        if (polys.some((p) => p.manualExterior)) renderCanvasOnly(); // nothing to animate otherwise
         axialAntsRAF = requestAnimationFrame(tick);
       }
       axialAntsRAF = requestAnimationFrame(tick);
