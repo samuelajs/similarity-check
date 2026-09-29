@@ -2,6 +2,8 @@
 import base64
 import binascii
 import json
+import os
+import socket
 import threading
 import time
 import urllib.parse
@@ -143,6 +145,23 @@ def room_points(room):
     }
 HOST = "127.0.0.1"
 PORT = 8765
+# Checked by the page (GET /version). A server started from an older copy of this file
+# has no /version at all, which is how the page can tell it is talking to a stale process.
+SERVER_FEATURES = ["axialLines", "facade"]
+
+
+class LocalServer(ThreadingHTTPServer):
+    """http.server enables SO_REUSEADDR, which on Windows lets a SECOND process bind a port
+    that an old server window is still listening on -- both then run on 8765 and requests
+    can keep landing on the old one (seen as: peta aksial never saved even though the file
+    on disk was already fixed). Refuse to share the port instead, so a second start fails
+    loudly and the old window has to be closed first."""
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self):
+        if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -177,6 +196,9 @@ class Handler(BaseHTTPRequestHandler):
             if name.endswith("-case.json") and target.is_file():
                 self._send(200, "application/json", target.read_bytes())
                 return
+        if self.path.split("?")[0] == "/version":
+            self._send(200, "application/json", json.dumps({"features": SERVER_FEATURES}).encode("utf-8"))
+            return
         if self.path.split("?")[0] == "/progress":
             _, _, query = self.path.partition("?")
             job_id = urllib.parse.parse_qs(query).get("id", [""])[0]
@@ -590,6 +612,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, "application/json", json.dumps({
             "saved": target.name,
             "image_saved": image_file,
+            # Echoed back so the page can confirm the lines really reached the file.
+            "axial_saved": len(record["axialLines"]),
         }).encode("utf-8"))
 
     def _delete_case(self, raw):
@@ -641,6 +665,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    try:
+        server = LocalServer((HOST, PORT), Handler)
+    except OSError:
+        print(f"Port {PORT} sudah dipakai -- kemungkinan jendela server lama masih terbuka.")
+        print("Tutup semua jendela server (demo_server.py) yang lama, lalu jalankan lagi.")
+        input("Tekan Enter untuk menutup...")
+        raise SystemExit(1)
     print(f"Demo siap di http://{HOST}:{PORT}/")
     server.serve_forever()

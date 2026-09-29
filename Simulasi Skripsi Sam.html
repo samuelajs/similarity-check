@@ -374,7 +374,7 @@
 
   .hie-rank-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; font-size: 12px; }
   .hie-rank-row:hover, .hie-rank-row.hl-linked { background: rgba(106,74,134,0.10); }
-  .hie-rank-name { flex: 0 0 108px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .hie-rank-name { flex: 0 0 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
   .hie-bar-track { flex: 1; height: 7px; border-radius: 4px; background: var(--paper-line); overflow: hidden; min-width: 40px; }
   .hie-bar-fill { height: 100%; border-radius: 4px; }
   .hie-bar-fill.conn { background: #6a4a86; }
@@ -398,10 +398,8 @@
   .axial-map-wrap canvas { width: 100%; height: 220px; border: 1px solid var(--paper-line); border-radius: var(--radius); background: #fff; cursor: default; }
   .axial-map-eye { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.9); }
   .axial-map-eye.active-hide { color: var(--rust); border-color: var(--rust); }
-  .axial-room-legend {
-    display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 6px 2px 0; font-size: 10.5px; color: var(--ink-soft);
-  }
-  .axial-room-legend .swatch-sm { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: middle; }
+  .swatch-sm { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; flex-shrink: 0; }
+  .hie-rank-mono .swatch-sm { display: none; }
   .axial-legend-bar {
     display: inline-block; width: 130px; height: 10px; border-radius: 5px;
     background: linear-gradient(to right, #0000ff, #00e5ff, #22cc22, #ffee00, #ff2200);
@@ -619,7 +617,6 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 C5 6 9 4 12 4 C15 4 19 6 22 12 C19 18 15 20 12 20 C9 20 5 18 2 12 Z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
-          <div class="axial-room-legend" id="hieRoomLegendA"></div>
           <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin:6px 0 10px; flex-wrap:wrap;">
             <div class="segmented-toggle" id="hieMetricToggleA">
               <button type="button" data-metric="con" class="active">CON</button>
@@ -642,7 +639,6 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 C5 6 9 4 12 4 C15 4 19 6 22 12 C19 18 15 20 12 20 C9 20 5 18 2 12 Z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
-          <div class="axial-room-legend" id="hieRoomLegendB"></div>
           <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin:6px 0 10px; flex-wrap:wrap;">
             <div class="segmented-toggle" id="hieMetricToggleB">
               <button type="button" data-metric="con" class="active">CON</button>
@@ -3211,7 +3207,7 @@
 
     function render() {
       renderCanvasOnly();
-      if (mode === "multi") renderSide();
+      renderSide();
     }
 
     function pathForPoly(pts, handles, closed) {
@@ -3375,6 +3371,12 @@
       label.style.flex = "1"; label.style.fontSize = "12px"; label.style.color = "var(--ink)"; label.style.cursor = "text";
       label.title = "Klik dua kali untuk ganti nama";
       label.textContent = (p.name || "(baru)") + " · " + p.points.length + " titik" + (p.closed ? "" : " · belum ditutup");
+      if (mode !== "multi") {
+        // Siluet layer row: no room name, color, rename or exterior flag -- just which
+        // polygon it is, plus hide/delete and drag-to-reorder (front/back for Minus Front).
+        label.textContent = "Poligon " + (i + 1) + " · " + p.points.length + " titik" + (p.closed ? "" : " · belum ditutup");
+        label.title = ""; label.style.cursor = "";
+      }
       label.ondblclick = (ev) => {
         ev.stopPropagation();
         const input = document.createElement("input");
@@ -3421,7 +3423,12 @@
         selection = null; // any selection's ri may now point at the wrong polygon
         render();
       };
-      row.append(colorInput, label, exitBtn, hideBtn, del);
+      if (mode === "multi") {
+        row.append(colorInput, label, exitBtn, hideBtn, del);
+      } else {
+        label.ondblclick = null;
+        row.append(label, hideBtn, del);
+      }
       wireRoomRowDrag(row, i);
       return row;
     }
@@ -3470,6 +3477,20 @@
 
     function renderSide() {
       sideEl.innerHTML = "";
+      if (mode !== "multi") {
+        // Edit Titik (siluet): the same layer list, polygons only -- this mode can hold
+        // several polygons at once (Merge/Minus Front must reduce them to one before
+        // Selesai), and lost its layer controls when the old floating LAYERS panel was
+        // folded into the room list, which only existed in Edit Ruang.
+        sideEl.appendChild(buildLayerGroup({
+          title: "LAYER", items: polys, collapsed: roomsCollapsed, layerHidden: roomsLayerHidden,
+          onToggleCollapse: () => { roomsCollapsed = !roomsCollapsed; renderSide(); },
+          onToggleLayerHide: () => { roomsLayerHidden = !roomsLayerHidden; render(); },
+          rowBuilder: buildRoomRow,
+          emptyText: "Belum ada poligon. Pilih tool Pena, lalu klik di gambar untuk mulai menggambar.",
+        }));
+        return;
+      }
       sideEl.appendChild(buildLayerGroup({
         title: "RUANG", items: polys, collapsed: roomsCollapsed, layerHidden: roomsLayerHidden,
         onToggleCollapse: () => { roomsCollapsed = !roomsCollapsed; renderSide(); },
@@ -3929,7 +3950,7 @@
               ensureHandles(poly);
               snapshot();
               interaction = {
-                type: "resize", ri: selection.ris[0], handle: key, box: imgBox,
+                type: "resize", ri: selection.ris[0], handle: key, box: imgBox, downPt: toImage(x, y, f),
                 origPoints: poly.points.map((p) => p.slice()),
                 origHandles: poly.handles.map((h) => (h ? h.slice() : null)),
               };
@@ -4172,10 +4193,22 @@
         // even a single-axis handle then scales uniformly ("bentuknya tidak berubah").
         const { box, handle } = interaction;
         const localBBox = { minX: -box.halfW, maxX: box.halfW, minY: -box.halfH, maxY: box.halfH };
+        // LOCAL frame = offset from the box center, unrotated. localBBox above is already
+        // center-relative, so every point fed into the scale math must be too -- an
+        // earlier version inverse-rotated around the center but never subtracted it, so
+        // absolute image coordinates were scaled against a center-relative anchor and the
+        // shape jumped/shrank on every resize ("kanvas objeknya geser-geser").
+        const toLocal = (p) => { const q = rotatePoint(p, box.center, -box.angle); return [q[0] - box.center[0], q[1] - box.center[1]]; };
+        const fromLocal = (q) => rotatePoint([q[0] + box.center[0], q[1] + box.center[1]], box.center, box.angle);
         const useCenter = e.altKey;
         const anchorLocal = useCenter ? [0, 0] : handlePoint(localBBox, OPPOSITE_HANDLE[handle]);
         const startLocal = handlePoint(localBBox, handle);
-        const curLocal = rotatePoint(toImage(x, y, f), box.center, -box.angle);
+        // Handle follows the pointer's DISPLACEMENT since pointerdown, not its absolute
+        // position -- the handle sits HANDLE_MARGIN px outside the shape's real corner, so
+        // snapping the corner onto the pointer would jump the shape by that margin on the
+        // very first move.
+        const curNow = toLocal(toImage(x, y, f)), curDown = toLocal(interaction.downPt);
+        const curLocal = [startLocal[0] + curNow[0] - curDown[0], startLocal[1] + curNow[1] - curDown[1]];
         const affectsX = handle.includes("w") || handle.includes("e");
         const affectsY = handle.includes("n") || handle.includes("s");
         let rawScaleX = affectsX && Math.abs(startLocal[0] - anchorLocal[0]) > 1e-6 ? (curLocal[0] - anchorLocal[0]) / (startLocal[0] - anchorLocal[0]) : 1;
@@ -4193,11 +4226,16 @@
         if (Math.abs(scaleX) < MIN_SCALE) scaleX = MIN_SCALE * Math.sign(scaleX || 1);
         if (Math.abs(scaleY) < MIN_SCALE) scaleY = MIN_SCALE * Math.sign(scaleY || 1);
         const scaleLocal = ([px, py]) => [anchorLocal[0] + (px - anchorLocal[0]) * scaleX, anchorLocal[1] + (py - anchorLocal[1]) * scaleY];
-        const nextPoints = interaction.origPoints.map((p) => rotatePoint(scaleLocal(rotatePoint(p, box.center, -box.angle)), box.center, box.angle));
+        const nextPoints = interaction.origPoints.map((p) => fromLocal(scaleLocal(toLocal(p))));
         if (hitsOthers(nextPoints, interaction.ri)) return;
         poly.points = nextPoints;
         ensureHandles(poly);
-        poly.handles = interaction.origHandles.map((h) => (h ? rotatePoint(scaleLocal(rotatePoint(h, box.center, -box.angle)), box.center, box.angle) : null));
+        poly.handles = interaction.origHandles.map((h) => (h ? fromLocal(scaleLocal(toLocal(h))) : null));
+        // Keep the drawn control box the size of the shape it now wraps -- otherwise it
+        // stays at the pre-resize size, and grabbing one of its (now misplaced) handles
+        // for a second resize anchors the scale on the wrong box.
+        const newHalfW = box.halfW * Math.abs(scaleX), newHalfH = box.halfH * Math.abs(scaleY);
+        selOrientBaseBBox = { minX: -newHalfW, maxX: newHalfW, minY: -newHalfH, maxY: newHalfH };
       } else if (interaction.type === "axialPoint") {
         axialLines[interaction.li].points[interaction.which] = toImage(x, y, f);
       } else if (interaction.type === "axialLine") {
@@ -4542,7 +4580,9 @@
         e.preventDefault();
         let dragging = false;
         const startY = e.clientY;
-        try { row.setPointerCapture(e.pointerId); } catch (_) {}
+        // No setPointerCapture here: capturing on the row retargets the follow-up
+        // click/dblclick to the row itself, so the name label's dblclick-to-rename never
+        // fired. The document-level listeners below already track the drag anywhere.
         function onMove(ev) {
           if (!dragging && Math.abs(ev.clientY - startY) > 4) { dragging = true; row.classList.add("dragging"); }
           if (!dragging) return;
@@ -4551,7 +4591,6 @@
         function onUp(ev) {
           document.removeEventListener("pointermove", onMove);
           document.removeEventListener("pointerup", onUp);
-          try { row.releasePointerCapture(e.pointerId); } catch (_) {}
           row.classList.remove("dragging");
           clearDropLine(row.parentElement);
           if (dragging) applyRoomReorder(ri, computeDropListIndex(row.parentElement, ev.clientY));
@@ -4973,7 +5012,7 @@
         baseHint = hint || "";
         titleEl.textContent = title || "";
         hintEl.textContent = baseHint;
-        sideEl.classList.toggle("show", mode === "multi");
+        sideEl.classList.add("show"); // both modes: Edit Ruang lists rooms/links/axial, Edit Titik lists polygon layers
         toolbarEl.hidden = false;
         toolbarEl.style.left = ""; toolbarEl.style.top = ""; // back to its default corner each time
         btnToolString.style.display = mode === "multi" ? "" : "none";
@@ -5315,6 +5354,12 @@
         const res = await fetch(getBackendUrl() + "/save_case", { method: "POST", body: JSON.stringify(payload) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || ("http_" + res.status));
+        if (payload.axialLines.length && data.axial_saved !== payload.axialLines.length) {
+          // Old server process: it wrote the file but without the axial lines.
+          statusEl.textContent = "";
+          alert("Data tersimpan TANPA peta aksial: server yang sedang berjalan adalah versi lama. Tutup semua jendela server, jalankan skripsi-sam/jalankan.bat lagi, lalu tekan Update Data sekali lagi.");
+          return;
+        }
         statusEl.textContent = "Tersimpan: " + data.saved;
         lastSavedSignature = computeSignature();
         lastSavedCaseName = data.saved;
@@ -5436,6 +5481,14 @@
       try {
         const res = await fetch(getBackendUrl() + "/hasil", { method: "GET" });
         if (!res.ok) throw new Error("http_" + res.status);
+        // A server process started from an older demo_server.py has no /version -- it
+        // answers, but silently drops newer data (peta aksial) on save.
+        const ver = await fetch(getBackendUrl() + "/version").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (!ver || !(ver.features || []).includes("axialLines")) {
+          statusEl.textContent = "terhubung ke server VERSI LAMA — tutup semua jendela server, lalu jalankan skripsi-sam/jalankan.bat lagi (peta aksial tidak akan tersimpan)";
+          statusEl.style.color = "var(--rust)";
+          return;
+        }
         statusEl.textContent = "terhubung";
         statusEl.style.color = "#3a8f5c";
       } catch (_) {
@@ -5590,28 +5643,11 @@
     const rooms = (p.roomState.rooms || []).filter((r) => r.points && r.points.length >= 3);
     const axialOk = !!(p.axialResult && p.axialResult.ok);
 
-    // Room-color legend: shown only when rooms display their own colors (default),
-    // hidden together with the colors themselves when the eye toggle switches to
-    // monochrome -- per Sam's request, the two always go together.
-    const legendEl = document.getElementById("hieRoomLegend" + panelKey);
-    if (legendEl) {
-      legendEl.innerHTML = "";
-      if (p.roomsMonochrome) {
-        legendEl.style.display = "none";
-      } else {
-        legendEl.style.display = "";
-        rooms.forEach((r) => {
-          if (r.hidden) return;
-          const item = document.createElement("span");
-          const sw = document.createElement("span");
-          sw.className = "swatch-sm";
-          sw.style.background = /^#[0-9a-fA-F]{6}$/.test(r.color || "") ? r.color : "#a8462f";
-          item.appendChild(sw);
-          item.appendChild(document.createTextNode(r.name || "(tanpa nama)"));
-          legendEl.appendChild(item);
-        });
-      }
-    }
+    // Room-color swatches now live next to each room name in the Ruang/Con./Int./Cho.
+    // table (per Sam) instead of a separate legend row -- still shown only while rooms
+    // display their own colors, hidden together with them in monochrome mode.
+    const rankEl = document.getElementById("hieRank" + panelKey);
+    if (rankEl) rankEl.classList.toggle("hie-rank-mono", !!p.roomsMonochrome);
 
     const allPts = rooms.flatMap((r) => r.points);
     if (axialOk) p.axialResult.segments.forEach((s) => { allPts.push(s.p0, s.p1); });
@@ -5732,7 +5768,7 @@
       const connectivity = connMap.get(r.id) || 0;
       const integration = axialOk ? axialResult.integration.get(r.id) : null;
       const choice = axialOk ? axialResult.choice.get(r.id) : null;
-      return { id: r.id, name: r.name || "(tanpa nama)", connectivity, integration, choice };
+      return { id: r.id, name: r.name || "(tanpa nama)", color: r.color, connectivity, integration, choice };
     });
     if (sortState.key && sortState.dir) {
       const sign = sortState.dir === "desc" ? -1 : 1;
@@ -5771,7 +5807,10 @@
       row.dataset.roomId = r.id;
       const name = document.createElement("span");
       name.className = "hie-rank-name";
-      name.textContent = r.name;
+      const sw = document.createElement("span");
+      sw.className = "swatch-sm";
+      sw.style.background = /^#[0-9a-fA-F]{6}$/.test(r.color || "") ? r.color : "#a8462f";
+      name.append(sw, document.createTextNode(r.name));
       name.title = r.name;
       const bars = [...hieBar("conn", r.connectivity)];
       if (axialOk) {
