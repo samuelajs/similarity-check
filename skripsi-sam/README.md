@@ -10,6 +10,7 @@ Folder ini saja yang diserahkan. Isinya cukup untuk mencoba deteksi ruang sampai
 | `demo.html` | Halaman unggah gambar |
 | `demo_server.py` | Menerima gambar dan mengembalikan hasil. Tidak online. |
 | `segment_denah.py` | Kode yang membaca denah |
+| `tampak_bukaan.py` | Kode yang menghitung rasio bukaan fasad dari gambar tampak (dipanggil lewat `/facade`) |
 | `requirements.txt` | Pustaka Python yang dibutuhkan |
 | `contoh/Gambar3.jpeg` | Contoh denah berlabel bahasa Inggris |
 
@@ -25,3 +26,7 @@ Halaman punya tiga mode. **Ruang** dan **Siluet** menyimpan titik ke `hasil/<nam
 ## Yang tidak ikut
 
 Folder percobaan (`tools`, model CubiCasa, skrip lama) tidak diperlukan untuk demo ini. Hosting dan akun Hugging Face juga tidak dipakai.
+
+## Rasio bukaan fasad (Komponen 4)
+
+Di `Simulasi Skripsi Sam.html`, bagian **Rasio & Pola Bukaan Fasad** di bawah hasil denah. Unggah satu gambar tampak untuk A dan satu untuk B (contoh ada di `contoh-tampak/`). Server mengembalikan overlay, rasio void-to-solid, jumlah bukaan, dan sebaran ukurannya. Periksa overlay-nya dulu sebelum memakai angkanya. Uji hitungnya: `python test_tampak_bukaan.py`.

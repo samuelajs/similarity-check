@@ -20,6 +20,7 @@ from segment_denah import (
     pdf_open, pdf_page_count, pdf_page_label, pdf_page_thumbnail_png,
     pdf_page_silhouette, pdf_page_rooms,
 )
+from tampak_bukaan import analyze_image as analyze_facade
 
 _ocr_engine = None
 
@@ -223,6 +224,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/pdf_segment_job":
             self._pdf_segment_job(raw, params)
             return
+        if path == "/facade":
+            self._facade(raw)
+            return
         if path != "/segment":
             self.send_error(404)
             return
@@ -272,6 +276,46 @@ class Handler(BaseHTTPRequestHandler):
             "mode": mode,
             "rooms": rooms,
             "adjacency": adjacency,
+        }).encode("utf-8"))
+
+    def _facade(self, raw):
+        """Komponen 4 (rasio bukaan fasad): runs tampak_bukaan.py as-is on one elevation
+        image. Opening sizes are also returned as a fraction of the CLASSIFIED facade area
+        (opening_px + wall_px) so two elevations drawn at different pixel scales can be
+        compared -- raw px^2 alone would make the size distribution depend on the
+        drawing's resolution. Deliberately not the envelope bbox: find_envelope can run
+        down over a title block/logo under the elevation (seen on tampak1), which would
+        shrink every fraction for reasons unrelated to the facade."""
+        image = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+        if image is None:
+            self._send(400, "application/json", b'{"error":"gambar tidak terbaca"}')
+            return
+        try:
+            result = analyze_facade(image)
+        except ValueError as exc:
+            self._send(422, "application/json", json.dumps({"error": str(exc)}).encode("utf-8"))
+            return
+        ok, png = cv2.imencode(".png", result["overlay"])
+        ex, ey, ew, eh = result["envelope"]
+        facade_area = float(result["opening_px"] + result["wall_px"]) or 1.0
+        ratio = result["void_to_solid_ratio"]
+        height, width = image.shape[:2]
+        self._send(200, "application/json", json.dumps({
+            "width": width,
+            "height": height,
+            "envelope": [ex, ey, ew, eh],
+            "opening_px": result["opening_px"],
+            "wall_px": result["wall_px"],
+            # inf (no wall pixel classified at all) is not valid JSON -- sent as null.
+            "void_to_solid_ratio": ratio if ratio != float("inf") else None,
+            "ratio_opening_of_classified": result["ratio_opening_of_classified"],
+            "ratio_opening_of_envelope": result["ratio_opening_of_envelope"],
+            "opening_count": result["opening_count"],
+            "openings": [
+                {"area_px": o["area_px"], "bbox": list(o["bbox"]), "area_frac": o["area_px"] / facade_area}
+                for o in result["openings"]
+            ],
+            "overlay_png": base64.b64encode(png.tobytes()).decode("ascii") if ok else None,
         }).encode("utf-8"))
 
     def _pdf_pages(self, raw):

@@ -115,6 +115,9 @@ def find_envelope(gray):
     h, w = gray.shape
     _, outline = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY_INV)
     has_ink_col = outline.any(axis=0)
+    if not has_ink_col.any():
+        # Blank/very faint image: no line dark enough to be a drawing at all.
+        raise ValueError("no_building")
     topmost = np.where(has_ink_col, outline.argmax(axis=0), h)
     roofline = int(topmost.min())
     is_building_col = topmost < (roofline + 0.35 * h)
@@ -254,6 +257,12 @@ def analyze(path):
     bgr = cv2.imread(path)
     if bgr is None:
         raise FileNotFoundError(path)
+    return analyze_image(bgr)
+
+
+def analyze_image(bgr):
+    """Same as analyze(), on an already-decoded BGR image (used by demo_server.py,
+    which receives the upload as bytes and never writes it to disk)."""
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     ex, ey, ew, eh = find_envelope(gray)
 

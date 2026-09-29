@@ -8,7 +8,7 @@ Skripsi Sam (S1 Arsitektur) awalnya soal "orisinalitas & plagiarisme arsitektur,
 1. **Bentuk massa/siluet** — EFD (Elliptical Fourier Descriptors) + tumpang-tindih area → **sudah jalan & teruji baik**
 2. **Topologi ruang** — Graph Edit Distance pada graf adjacency ruang → **baru tahap deteksi ruang, GED-nya sendiri belum dikerjakan**
 3. Hierarki ruang (sentralitas graf) → belum dikerjakan
-4. Rasio bukaan fasad → belum dikerjakan
+4. Rasio bukaan fasad → `skripsi-sam/tampak_bukaan.py` (diuji `test_tampak_bukaan.py`), tersambung ke UI lewat endpoint `/facade` di `demo_server.py` (bagian "Rasio & Pola Bukaan Fasad" di `Simulasi Skripsi Sam.html`)
 5. Pola second-skin (Fourier 2D) → baru didemokan di Python (bukan di prototipe web)
 
 ## 2. Lokasi File

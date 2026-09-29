@@ -411,7 +411,7 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="kicker">Prototipe &middot; Komponen 1&ndash;2 dari 5</p>
+    <p class="kicker">Prototipe &middot; Komponen 1&ndash;4 dari 5</p>
     <h1>Pembanding Kemiripan Bentuk Siluet</h1>
     <p>Gambar dua siluet (kontur luar denah atau tampak) dengan mengklik titik-titik di kanvas, lalu bandingkan. Sistem menyejajarkan skala dan rotasi secara otomatis sebelum menghitung tumpang-tindih — persis prinsip yang sudah diuji pada demo-demo sebelumnya. <b>Deteksi Otomatis</b> dan <b>Deteksi Ruang</b> memakai server Python lokal (kode yang sama dengan <code>skripsi-sam/segment_denah.py</code>) — jalankan <code>skripsi-sam/jalankan.bat</code> dulu sebelum memakai kedua tombol itu.</p>
   </header>
@@ -667,8 +667,59 @@
     </div>
   </div>
 
+  <section id="facadeSection" style="margin-top:34px;">
+    <p class="kicker">Komponen 4 dari 5</p>
+    <h2 style="font-size:21px; margin:0 0 6px;">Rasio &amp; Pola Bukaan Fasad (Tampak)</h2>
+    <p class="hint" style="padding:0 0 14px; max-width:78ch;">Unggah dua gambar <b>tampak</b> (elevasi) &mdash; terpisah dari denah di atas, karena jenis dokumen ditentukan pengguna, bukan dideteksi otomatis. Server Python menjalankan <code>tampak_bukaan.py</code> apa adanya. Hasilnya: <i>void-to-solid ratio</i> (luas bukaan &divide; luas dinding solid, Carmona dkk. 2003 &mdash; pintu dan pintu garasi ikut dihitung sebagai bukaan), dilaporkan <b>berdampingan</b> dengan jumlah dan sebaran ukuran bukaan, tidak digabung jadi satu angka. <b>Selalu periksa overlay</b> (oranye = bukaan, biru muda = dinding, kotak hijau = batas bangunan) sebelum memakai angkanya.</p>
+    <div class="stage">
+      <div class="panel" id="facadePanelA">
+        <div class="panel-head"><span class="label"><span class="swatch" style="background:#2e4c7a"></span>Tampak A</span><span class="count" id="facadeNameA">belum ada gambar</span></div>
+        <div style="padding:10px 16px; min-height:120px; display:flex; align-items:center; justify-content:center;">
+          <img id="facadeImgA" alt="Overlay bukaan tampak A" style="max-width:100%; max-height:420px; display:none; border:1px solid var(--paper-line);">
+          <span id="facadeEmptyA" class="hint" style="padding:0;">Belum dianalisis.</span>
+        </div>
+        <div class="panel-foot">
+          <button id="facadeUploadA" type="button">Unggah Tampak</button>
+          <input type="file" id="facadeFileA" accept="image/*" style="display:none">
+          <span class="ocr-progress" id="facadeStatusA" style="font-size:11.5px; color:var(--ink-soft); align-self:center;"></span>
+        </div>
+        <div id="facadeReadA" style="padding:0 16px 14px; font-size:12.5px;"></div>
+      </div>
+      <div class="panel" id="facadePanelB">
+        <div class="panel-head"><span class="label"><span class="swatch" style="background:#a8462f"></span>Tampak B</span><span class="count" id="facadeNameB">belum ada gambar</span></div>
+        <div style="padding:10px 16px; min-height:120px; display:flex; align-items:center; justify-content:center;">
+          <img id="facadeImgB" alt="Overlay bukaan tampak B" style="max-width:100%; max-height:420px; display:none; border:1px solid var(--paper-line);">
+          <span id="facadeEmptyB" class="hint" style="padding:0;">Belum dianalisis.</span>
+        </div>
+        <div class="panel-foot">
+          <button id="facadeUploadB" type="button">Unggah Tampak</button>
+          <input type="file" id="facadeFileB" accept="image/*" style="display:none">
+          <span class="ocr-progress" id="facadeStatusB" style="font-size:11.5px; color:var(--ink-soft); align-self:center;"></span>
+        </div>
+        <div id="facadeReadB" style="padding:0 16px 14px; font-size:12.5px;"></div>
+      </div>
+    </div>
+    <div class="panel" id="facadeCompare" style="display:none">
+      <div class="panel-head"><span class="label">Perbandingan Bukaan Fasad A&ndash;B</span></div>
+      <div class="score-strip">
+        <div>
+          <p class="score-label">Selisih Rasio Void-to-Solid</p>
+          <p class="score-big" id="facadeDiffBig">&mdash;</p>
+        </div>
+        <p class="score-note" id="facadeDiffNote"></p>
+        <div class="readout-grid" style="flex-wrap:wrap; flex-shrink:1; min-width:0; max-width:100%;">
+          <div class="readout"><p class="k">Jumlah bukaan A / B</p><p class="v" id="facadeCountReadout">&mdash;</p></div>
+          <div class="readout"><p class="k">Median ukuran A / B</p><p class="v" id="facadeMedianReadout">&mdash;</p></div>
+          <div class="readout"><p class="k">Bukaan terbesar A / B</p><p class="v" id="facadeMaxReadout">&mdash;</p></div>
+        </div>
+      </div>
+      <p class="score-note" id="facadeDominanceNote" style="display:none; max-width:none; padding:0 22px 14px;"></p>
+      <p class="hint">Ukuran bukaan ditampilkan sebagai <b>% luas fasad terklasifikasi</b> (bukaan + dinding, bukan piksel mentah), supaya dua tampak yang digambar pada skala/resolusi berbeda tetap sebanding. Sengaja bukan % kotak batas hijau, karena kotak itu bisa ikut melebar ke kop/logo di bawah gambar. Selisih rasio adalah selisih mutlak |A &minus; B| &mdash; monoton <i>by construction</i> (metodologi &sect;4.4/&sect;5.2). Tiga ukuran ini sengaja tidak digabung jadi satu skor (&sect;3.1).</p>
+    </div>
+  </section>
+
   <footer>
-    <p><b>Catatan prototipe:</b> tiga dari lima komponen yang dirancang sudah berjalan (bentuk massa via EFD + tumpang-tindih; topologi ruang via GED; hierarki ruang via sentralitas graf — rasio bukaan fasad dan pola second-skin belum dikerjakan). Gambar tangan/preset dan seluruh perhitungan kemiripan bentuk (<b>tumpang-tindih area</b> — rasterisasi + pencarian rotasi, dan <b>jarak koefisien EFD</b>, Kuhl &amp; Giardina 1982 — implementasi asli, diuji sendiri: sama-sama nol untuk bentuk identik meski diputar/diskalakan, dan menjauh dari nol untuk bentuk berbeda) berjalan sepenuhnya di perangkat Anda, sesuai metode inti di naskah Bab 2.5.1/3.4.2. <b>Deteksi Otomatis</b> (siluet massa) dan <b>Deteksi Ruang</b> (label + poligon/kotak ruang + celah pintu untuk hubungan antar-ruang) mengirim gambar ATAU PDF ke server Python lokal yang menjalankan <code>segment_denah.py</code> apa adanya (RapidOCR + OpenCV untuk gambar raster; PyMuPDF untuk PDF, membaca data vektor gambar kerja langsung — dinding dari poligon terisi, garis lantai/lengkung dari garis bertinta yang bukan garis dimensi, dan nama ruang dari teks asli PDF, jadi tanpa risiko salah-baca OCR sama sekali). Satu tombol unggah saja — jenis berkas (gambar atau PDF) dideteksi otomatis; untuk PDF beberapa lembar, muncul pemilih halaman dengan pratinjau sebelum lembar itu dianalisis. Semua titik poligon dan hubungan antar-ruang diedit lewat mode layar penuh ("Edit Titik" / "Edit Ruang", dengan tool Pena/Persegi/Oval/Penghapus Area/Tali Penghubung untuk mengoreksi bentuk maupun sambungan pintu secara manual) — larangan tumpang-tindih otomatis berlaku antar ruangan. <b>Kemiripan Topologi Ruang</b> dihitung dari graf ruang (node = ruang, edge = pintu) via <i>Graph Edit Distance</i> aproksimasi bipartite matching (Riesen &amp; Bunke 2009 — batas atas GED asli, bukan nilai eksak minimum; dipilih karena GED eksak NP-hard/berat untuk graf besar), dengan biaya substitusi node memakai kesamaan nama ruang (bobot 0.7) dan proporsi luas lantai relatif (bobot 0.3, dari poligon ruang tahap 1) — untuk tiap ruang, luasnya (piksel poligon, bukan satuan fisik/m², tidak dikalibrasi ke skala nyata) dibagi TOTAL LUAS SELURUH RUANG YANG ADA DI DAFTAR RUANG saat itu (bukan luas total bangunan/siluet — itu tidak ikut dihitung di sini), jadi menghapus satu ruang dari daftar ikut menggeser proporsi ruang-ruang lain yang masih ada (efek riak yang disengaja pada daftar ruang, bukan bug, dan bukan pernyataan tentang luas bangunan). Perhitungan ini juga berjalan sepenuhnya di perangkat Anda, memakai data ruang yang sudah ada tanpa perlu deteksi baru. <b>Kemiripan Hierarki Ruang</b> mengukur TIGA sentralitas graf per ruang, sesuai tiga ukuran terpisah pada Space Syntax (Hillier &amp; Hanson) — bukan digabung jadi satu seperti draf awal fitur ini: (1) <i>konektivitas</i> (<i>degree centrality</i>, porsi ruang lain yang terhubung langsung lewat pintu — tidak butuh peta aksial); (2) <i>Integrasi (NAIN)</i> dan (3) <i>Choice (NACH)</i> — BUKAN LAGI adaptasi (closeness/betweenness graf-ruang polos, seperti versi awal fitur ini), melainkan rumus ASLI Space Syntax untuk <i>angular segment analysis</i> (Turner 2001): user menggambar <i>peta aksial</i> (garis lurus mewakili garis pandang/pergerakan, tool "Peta Aksial" di Edit Ruang) di atas denah yang sama; garis-garis itu dipecah jadi segmen di tiap titik potong (metode segmen modern, bukan garis-utuh 1984), membentuk graf berbobot SUDUT BELOK (0 = lurus, 1 = putar balik, konvensi Turner/DepthmapX) antar segmen. Akses ke luar bangunan (dibutuhkan sebagai "akar" perhitungan) dideteksi OTOMATIS dari ujung garis aksial yang keluar siluet, ditambah TOGGLE MANUAL per ruang (ikon pintu-keluar di daftar ruang) sebagai pelengkap/koreksi — keduanya digabung (union), bukan saling menggantikan. Dari graf segmen ini: <i>Integrasi</i> = NAIN (<i>Normalised Angular Integration</i> = NC<sup>1.2</sup>/(TD+2)) dan <i>Choice</i> = NACH (<i>Normalised Angular Choice</i> = log2(CH+1)/log2(TD+3)), keduanya dari Hillier, Yang &amp; Turner (2012) — BUKAN rumus RRA/konstanta Kruger 1984, yang kalibrasinya khusus untuk depth berlangkah-satuan (topologis), bukan bobot sudut kontinu seperti di sini (ditemukan &amp; diperbaiki lewat pengujian sebelum fitur ini dipasang). Nilai per ruang diambil dari SEGMEN PALING SENTRAL yang menyentuh ruang itu (bukan dirata-rata, karena satu ruang bisa dilewati beberapa segmen). <b>Gerbang data keras</b> (bukan fallback diam-diam): Integrasi/Choice — dan skor Hierarki gabungan yang memakainya — hanya dihitung kalau KEDUA bentuk punya siluet tertutup, data ruang, minimal satu garis aksial, DAN minimal satu akses-ke-luar terdeteksi/ditandai; kalau tidak, panel menampilkan pesan spesifik apa yang kurang, bukan angka lama atau adaptasi diam-diam. Konektivitas tetap tampil independen dari syarat ini. Integrasi dan Choice adalah dua ukuran berbeda (ruang mudah dicapai belum tentu jadi jalur lintasan, dan sebaliknya). Pemetaan ruang tahap ini dihitung ULANG secara independen dari tahap topologi lewat Hungarian/bipartite matching tersendiri (bukan memakai hasil pencocokan GED tahap sebelumnya), dengan biaya substitusi node memakai kesamaan nama ruang (bobot 0.4), selisih konektivitas (bobot 0.2), selisih Integrasi (bobot 0.2), dan selisih Choice (bobot 0.2) — NAIN/NACH dinormalisasi ke rentang 0–1 relatif terhadap ruang lain di denah yang sama sebelum dibandingkan, supaya adil antar denah berukuran beda; delete/insert tetap biaya satuan 1, sama seperti tahap topologi. Semua data (poligon siluet, poligon ruang, hubungan antar-ruang, dan gambar aslinya) bisa disimpan/dimuat lewat "Simpan Data"/"Muat Kasus" ke server Python lokal, untuk dipakai lagi di komponen-komponen berikutnya. Untuk denah di luar kotak-siku standar (dinding melengkung/diagonal, atau massa yang tampak terpisah tanpa dinding luar penuh), metode deteksi dinding dan strategi siluet dipilih OTOMATIS di server berdasarkan data gambarnya sendiri — tidak ada lagi centang manual per panel. Siluet pada bagian yang massanya tampak terpisah tetap dianggap SATU kesatuan denah (mengikuti garis lantai/outline terluar yang memang tergambar di sana, bukan gabungan buatan dari beberapa massa) — celah antar bagian ditutup dengan radius yang MENYESUAIKAN OTOMATIS ke celah asli gambar (dari jarak minimum antar-bagian lewat <i>minimum spanning tree</i>, dieskalasi bertahap sampai benar-benar tersambung — bukan angka tetap yang ditebak), lalu kontur luar hasil gabungan itu dijiplak apa adanya (mengikuti lekukan asli, bukan garis lurus <i>convex hull</i> yang memotong tiap lekukan; hull tetap dipakai sebagai cadangan kalau penggabungan gagal total). Untuk kedua jalur input (gambar maupun PDF) pada denah dengan dinding melengkung/pie-slice, <b>Deteksi Ruang</b> BELUM bisa menggambar bentuk ruang otomatis — celah pintu pada dinding semacam itu terbukti belum bisa dijembatani secara andal walau sudah dicoba beberapa pendekatan (penutupan morfologi, penyambungan titik-ujung kerangka garis) — jadi tiap ruang mendapat kotak PERKIRAAN luas dari jarak ke dinding/garis-lantai terdekat ke empat arah (kiri/kanan/atas/bawah) dari posisi namanya, dengan jarak maksimum tiap arah menyesuaikan otomatis ke skala ruang di gambar itu sendiri (median jarak dinding-terdekat dari semua ruang yang terdeteksi) supaya ruang yang sisi tertentunya memang terbuka tidak membengkak sampai menabrak ruang lain — untuk digambar ulang manual lewat "Edit Ruang". Gambar/PDF hanya dikirim ke <code>127.0.0.1</code> di komputer Anda sendiri, tidak ke server manapun di internet.</p>
+    <p><b>Catatan prototipe:</b> empat dari lima komponen yang dirancang sudah berjalan (bentuk massa via EFD + tumpang-tindih; topologi ruang via GED; hierarki ruang via sentralitas graf; rasio bukaan fasad via <code>tampak_bukaan.py</code> di server Python — pola second-skin belum dikerjakan). Gambar tangan/preset dan seluruh perhitungan kemiripan bentuk (<b>tumpang-tindih area</b> — rasterisasi + pencarian rotasi, dan <b>jarak koefisien EFD</b>, Kuhl &amp; Giardina 1982 — implementasi asli, diuji sendiri: sama-sama nol untuk bentuk identik meski diputar/diskalakan, dan menjauh dari nol untuk bentuk berbeda) berjalan sepenuhnya di perangkat Anda, sesuai metode inti di naskah Bab 2.5.1/3.4.2. <b>Deteksi Otomatis</b> (siluet massa) dan <b>Deteksi Ruang</b> (label + poligon/kotak ruang + celah pintu untuk hubungan antar-ruang) mengirim gambar ATAU PDF ke server Python lokal yang menjalankan <code>segment_denah.py</code> apa adanya (RapidOCR + OpenCV untuk gambar raster; PyMuPDF untuk PDF, membaca data vektor gambar kerja langsung — dinding dari poligon terisi, garis lantai/lengkung dari garis bertinta yang bukan garis dimensi, dan nama ruang dari teks asli PDF, jadi tanpa risiko salah-baca OCR sama sekali). Satu tombol unggah saja — jenis berkas (gambar atau PDF) dideteksi otomatis; untuk PDF beberapa lembar, muncul pemilih halaman dengan pratinjau sebelum lembar itu dianalisis. Semua titik poligon dan hubungan antar-ruang diedit lewat mode layar penuh ("Edit Titik" / "Edit Ruang", dengan tool Pena/Persegi/Oval/Penghapus Area/Tali Penghubung untuk mengoreksi bentuk maupun sambungan pintu secara manual) — larangan tumpang-tindih otomatis berlaku antar ruangan. <b>Kemiripan Topologi Ruang</b> dihitung dari graf ruang (node = ruang, edge = pintu) via <i>Graph Edit Distance</i> aproksimasi bipartite matching (Riesen &amp; Bunke 2009 — batas atas GED asli, bukan nilai eksak minimum; dipilih karena GED eksak NP-hard/berat untuk graf besar), dengan biaya substitusi node memakai kesamaan nama ruang (bobot 0.7) dan proporsi luas lantai relatif (bobot 0.3, dari poligon ruang tahap 1) — untuk tiap ruang, luasnya (piksel poligon, bukan satuan fisik/m², tidak dikalibrasi ke skala nyata) dibagi TOTAL LUAS SELURUH RUANG YANG ADA DI DAFTAR RUANG saat itu (bukan luas total bangunan/siluet — itu tidak ikut dihitung di sini), jadi menghapus satu ruang dari daftar ikut menggeser proporsi ruang-ruang lain yang masih ada (efek riak yang disengaja pada daftar ruang, bukan bug, dan bukan pernyataan tentang luas bangunan). Perhitungan ini juga berjalan sepenuhnya di perangkat Anda, memakai data ruang yang sudah ada tanpa perlu deteksi baru. <b>Kemiripan Hierarki Ruang</b> mengukur TIGA sentralitas graf per ruang, sesuai tiga ukuran terpisah pada Space Syntax (Hillier &amp; Hanson) — bukan digabung jadi satu seperti draf awal fitur ini: (1) <i>konektivitas</i> (<i>degree centrality</i>, porsi ruang lain yang terhubung langsung lewat pintu — tidak butuh peta aksial); (2) <i>Integrasi (NAIN)</i> dan (3) <i>Choice (NACH)</i> — BUKAN LAGI adaptasi (closeness/betweenness graf-ruang polos, seperti versi awal fitur ini), melainkan rumus ASLI Space Syntax untuk <i>angular segment analysis</i> (Turner 2001): user menggambar <i>peta aksial</i> (garis lurus mewakili garis pandang/pergerakan, tool "Peta Aksial" di Edit Ruang) di atas denah yang sama; garis-garis itu dipecah jadi segmen di tiap titik potong (metode segmen modern, bukan garis-utuh 1984), membentuk graf berbobot SUDUT BELOK (0 = lurus, 1 = putar balik, konvensi Turner/DepthmapX) antar segmen. Akses ke luar bangunan (dibutuhkan sebagai "akar" perhitungan) dideteksi OTOMATIS dari ujung garis aksial yang keluar siluet, ditambah TOGGLE MANUAL per ruang (ikon pintu-keluar di daftar ruang) sebagai pelengkap/koreksi — keduanya digabung (union), bukan saling menggantikan. Dari graf segmen ini: <i>Integrasi</i> = NAIN (<i>Normalised Angular Integration</i> = NC<sup>1.2</sup>/(TD+2)) dan <i>Choice</i> = NACH (<i>Normalised Angular Choice</i> = log2(CH+1)/log2(TD+3)), keduanya dari Hillier, Yang &amp; Turner (2012) — BUKAN rumus RRA/konstanta Kruger 1984, yang kalibrasinya khusus untuk depth berlangkah-satuan (topologis), bukan bobot sudut kontinu seperti di sini (ditemukan &amp; diperbaiki lewat pengujian sebelum fitur ini dipasang). Nilai per ruang diambil dari SEGMEN PALING SENTRAL yang menyentuh ruang itu (bukan dirata-rata, karena satu ruang bisa dilewati beberapa segmen). <b>Gerbang data keras</b> (bukan fallback diam-diam): Integrasi/Choice — dan skor Hierarki gabungan yang memakainya — hanya dihitung kalau KEDUA bentuk punya siluet tertutup, data ruang, minimal satu garis aksial, DAN minimal satu akses-ke-luar terdeteksi/ditandai; kalau tidak, panel menampilkan pesan spesifik apa yang kurang, bukan angka lama atau adaptasi diam-diam. Konektivitas tetap tampil independen dari syarat ini. Integrasi dan Choice adalah dua ukuran berbeda (ruang mudah dicapai belum tentu jadi jalur lintasan, dan sebaliknya). Pemetaan ruang tahap ini dihitung ULANG secara independen dari tahap topologi lewat Hungarian/bipartite matching tersendiri (bukan memakai hasil pencocokan GED tahap sebelumnya), dengan biaya substitusi node memakai kesamaan nama ruang (bobot 0.4), selisih konektivitas (bobot 0.2), selisih Integrasi (bobot 0.2), dan selisih Choice (bobot 0.2) — memakai nilai NAIN/NACH MENTAH (keduanya sudah ternormalisasi lintas-ukuran-sistem oleh rumusnya sendiri); normalisasi 0–1 per denah hanya dipakai untuk tampilan bar/tabel, tidak ikut ke perhitungan biaya/skor, dan ruang yang tak tersentuh garis aksial diberi biaya selisih terburuk; delete/insert tetap biaya satuan 1, sama seperti tahap topologi. Semua data (poligon siluet, poligon ruang, hubungan antar-ruang, dan gambar aslinya) bisa disimpan/dimuat lewat "Simpan Data"/"Muat Kasus" ke server Python lokal, untuk dipakai lagi di komponen-komponen berikutnya. Untuk denah di luar kotak-siku standar (dinding melengkung/diagonal, atau massa yang tampak terpisah tanpa dinding luar penuh), metode deteksi dinding dan strategi siluet dipilih OTOMATIS di server berdasarkan data gambarnya sendiri — tidak ada lagi centang manual per panel. Siluet pada bagian yang massanya tampak terpisah tetap dianggap SATU kesatuan denah (mengikuti garis lantai/outline terluar yang memang tergambar di sana, bukan gabungan buatan dari beberapa massa) — celah antar bagian ditutup dengan radius yang MENYESUAIKAN OTOMATIS ke celah asli gambar (dari jarak minimum antar-bagian lewat <i>minimum spanning tree</i>, dieskalasi bertahap sampai benar-benar tersambung — bukan angka tetap yang ditebak), lalu kontur luar hasil gabungan itu dijiplak apa adanya (mengikuti lekukan asli, bukan garis lurus <i>convex hull</i> yang memotong tiap lekukan; hull tetap dipakai sebagai cadangan kalau penggabungan gagal total). Untuk kedua jalur input (gambar maupun PDF) pada denah dengan dinding melengkung/pie-slice, <b>Deteksi Ruang</b> BELUM bisa menggambar bentuk ruang otomatis — celah pintu pada dinding semacam itu terbukti belum bisa dijembatani secara andal walau sudah dicoba beberapa pendekatan (penutupan morfologi, penyambungan titik-ujung kerangka garis) — jadi tiap ruang mendapat kotak PERKIRAAN luas dari jarak ke dinding/garis-lantai terdekat ke empat arah (kiri/kanan/atas/bawah) dari posisi namanya, dengan jarak maksimum tiap arah menyesuaikan otomatis ke skala ruang di gambar itu sendiri (median jarak dinding-terdekat dari semua ruang yang terdeteksi) supaya ruang yang sisi tertentunya memang terbuka tidak membengkak sampai menabrak ruang lain — untuk digambar ulang manual lewat "Edit Ruang". Gambar/PDF hanya dikirim ke <code>127.0.0.1</code> di komputer Anda sendiri, tidak ke server manapun di internet.</p>
   </footer>
 </div>
 
@@ -5954,6 +6005,138 @@
   }
 
   checkReady();
+})();
+</script>
+<script>
+// ---------- Komponen 4: rasio & pola bukaan fasad (tampak) ----------
+// Detection runs server-side in skripsi-sam/tampak_bukaan.py (unchanged logic, validated
+// by test_tampak_bukaan.py); this block only uploads, shows the overlay for manual
+// checking, and lays the per-elevation results side by side.
+(function () {
+  "use strict";
+  const DOMINANCE_NOTE_THRESHOLD = 0.5; // largest opening >= 50% of all opening area
+  const facadeData = { A: null, B: null };
+
+  function backendUrl() {
+    const input = document.getElementById("backendUrl");
+    const raw = (input && input.value || "").trim();
+    return (raw || "http://127.0.0.1:8765").replace(/\/+$/, "");
+  }
+  const ERRORS = {
+    backend_unreachable: "Server Python tidak terjangkau. Jalankan skripsi-sam/jalankan.bat (atau `python demo_server.py`) dulu, cek alamat server di atas, lalu coba lagi.",
+    no_building: "Tidak ada garis gambar yang cukup gelap untuk dikenali sebagai tampak bangunan.",
+    "gambar tidak terbaca": "Berkas ini tidak bisa dibaca sebagai gambar.",
+  };
+  const pct = (x) => (x * 100).toFixed(1) + "%";
+  const median = (arr) => {
+    if (!arr.length) return null;
+    const s = arr.slice().sort((a, b) => a - b), m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+
+  function summarize(d) {
+    const fracs = d.openings.map((o) => o.area_frac);
+    const total = d.openings.reduce((acc, o) => acc + o.area_px, 0);
+    return {
+      ratio: d.void_to_solid_ratio,
+      count: d.opening_count,
+      medianFrac: median(fracs),
+      maxFrac: fracs.length ? Math.max(...fracs) : null,
+      dominance: total > 0 ? d.openings[0].area_px / total : null, // openings sorted largest first
+    };
+  }
+
+  function renderPanel(side) {
+    const d = facadeData[side];
+    const el = document.getElementById("facadeRead" + side);
+    if (!d) { el.innerHTML = ""; return; }
+    const s = summarize(d);
+    const ratioTxt = s.ratio === null ? "&infin; (tak ada dinding terklasifikasi)" : s.ratio.toFixed(3);
+    el.innerHTML =
+      "<b>Void-to-solid</b> = " + ratioTxt +
+      " <span style='color:var(--ink-soft)'>(" + d.opening_px.toLocaleString("id-ID") + " / " + d.wall_px.toLocaleString("id-ID") + " px)</span><br>" +
+      "<b>Jumlah bukaan</b> = " + s.count +
+      (s.count ? " &middot; ukuran median " + pct(s.medianFrac) + ", terbesar " + pct(s.maxFrac) + " dari luas fasad terklasifikasi" : "") + "<br>" +
+      "<span style='color:var(--ink-soft)'>Konteks diagnostik (bukan metrik rujukan): bukaan/(bukaan+dinding) = " +
+      pct(d.ratio_opening_of_classified) + ", bukaan/kotak batas = " + pct(d.ratio_opening_of_envelope) + "</span>";
+  }
+
+  function renderCompare() {
+    const box = document.getElementById("facadeCompare");
+    if (!facadeData.A || !facadeData.B) { box.style.display = "none"; return; }
+    box.style.display = "";
+    const a = summarize(facadeData.A), b = summarize(facadeData.B);
+    const big = document.getElementById("facadeDiffBig");
+    const note = document.getElementById("facadeDiffNote");
+    if (a.ratio === null || b.ratio === null) {
+      big.innerHTML = "&mdash;";
+      note.textContent = "Selisih rasio tidak dihitung: salah satu tampak tidak punya piksel dinding terklasifikasi (rasio tak hingga). Periksa overlay-nya.";
+    } else {
+      big.textContent = Math.abs(a.ratio - b.ratio).toFixed(3);
+      note.textContent = "Rasio A = " + a.ratio.toFixed(3) + ", rasio B = " + b.ratio.toFixed(3) +
+        ". 0 = proporsi bukaan terhadap dinding identik; makin besar makin berbeda. Rasio bisa > 1 bila bukaan lebih luas dari dinding.";
+    }
+    const fmt = (x) => (x === null ? "–" : pct(x));
+    document.getElementById("facadeCountReadout").textContent = a.count + " / " + b.count;
+    document.getElementById("facadeMedianReadout").textContent = fmt(a.medianFrac) + " / " + fmt(b.medianFrac);
+    document.getElementById("facadeMaxReadout").textContent = fmt(a.maxFrac) + " / " + fmt(b.maxFrac);
+    const dom = [];
+    if (a.dominance !== null && a.dominance >= DOMINANCE_NOTE_THRESHOLD) dom.push("A (" + pct(a.dominance) + ")");
+    if (b.dominance !== null && b.dominance >= DOMINANCE_NOTE_THRESHOLD) dom.push("B (" + pct(b.dominance) + ")");
+    const domEl = document.getElementById("facadeDominanceNote");
+    if (dom.length) {
+      domEl.style.display = "";
+      domEl.textContent = "Catatan: pada tampak " + dom.join(" dan ") + ", satu bukaan terbesar menyumbang ≥ " +
+        pct(DOMINANCE_NOTE_THRESHOLD) + " dari seluruh luas bukaan (mis. pintu garasi). Rasio luas bisa didominasi bukaan tunggal ini " +
+        "dan menyamarkan pola komposisi — baca bersama jumlah & sebaran ukuran (metodologi §4.4). Catatan ini tidak mengubah angka apa pun.";
+    } else {
+      domEl.style.display = "none";
+    }
+  }
+
+  function wire(side) {
+    const btn = document.getElementById("facadeUpload" + side);
+    const input = document.getElementById("facadeFile" + side);
+    const status = document.getElementById("facadeStatus" + side);
+    const img = document.getElementById("facadeImg" + side);
+    const empty = document.getElementById("facadeEmpty" + side);
+    btn.onclick = () => input.click();
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      input.value = "";
+      if (!file) return;
+      document.getElementById("facadeName" + side).textContent = file.name;
+      status.style.color = "var(--ink-soft)";
+      status.textContent = "Menganalisis…";
+      btn.disabled = true;
+      let data = null, code = null;
+      try {
+        const res = await fetch(backendUrl() + "/facade", { method: "POST", body: file });
+        data = await res.json().catch(() => null);
+        if (!res.ok || !data) { code = (data && data.error) || ("http_" + res.status); data = null; }
+      } catch (_) {
+        code = "backend_unreachable";
+      }
+      btn.disabled = false;
+      if (!data) {
+        facadeData[side] = null;
+        img.style.display = "none"; empty.style.display = "";
+        status.style.color = "var(--rust)";
+        status.textContent = ERRORS[code] || ("Analisis gagal: " + code);
+      } else {
+        facadeData[side] = data;
+        if (data.overlay_png) {
+          img.src = "data:image/png;base64," + data.overlay_png;
+          img.style.display = ""; empty.style.display = "none";
+        }
+        status.textContent = "Selesai — periksa overlay.";
+      }
+      renderPanel(side);
+      renderCompare();
+    };
+  }
+  wire("A");
+  wire("B");
 })();
 </script>
 </body>
