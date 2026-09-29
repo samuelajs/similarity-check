@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Deteksi ruang denah</title>
+  <style>
+    body { font-family: Georgia, serif; margin: 32px auto; max-width: 980px; color: #1c2530; background: #f4f7f8; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    p { line-height: 1.5; }
+    button, input { font: inherit; }
+    button { background: #1c2530; color: white; border: 0; padding: 8px 14px; cursor: pointer; }
+    button.active { background: #a8462f; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
+    .stage { position: relative; display: inline-block; max-width: 100%; background: white; border: 1px solid #d5dde3; }
+    .stage img, .stage canvas { display: block; max-width: 100%; height: auto; }
+    .stage canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; cursor: crosshair; }
+    .room { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+    .room input { flex: 1; padding: 6px 8px; border: 1px solid #d5dde3; }
+    .swatch { width: 14px; height: 14px; }
+    .tag { font-size: 12px; color: #5c6b7a; }
+    .note { color: #5c6b7a; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Deteksi denah</h1>
+  <p>Dua mode memakai titik yang sama-sama bisa disimpan. Ruang: beberapa poligon yang tidak saling menimpa. Siluet: satu garis luar massa bangunan. Nama hanya saran dari tulisan di gambar ini. Kalau tulisannya tidak ada, kotak nama kosong dan Anda yang mengisinya.</p>
+  <div class="row">
+    <button id="modeRuang" class="active" type="button">Mode ruang</button>
+    <button id="modeSiluet" type="button">Mode siluet</button>
+    <button id="modeBanding" type="button">Mode banding siluet</button>
+  </div>
+  <div id="editor">
+  <div class="row">
+    <input id="file" type="file" accept="image/*">
+    <button id="sample" type="button">Pakai contoh Gambar3</button>
+    <button id="go" type="button">Deteksi</button>
+    <button id="add" type="button">Tambah poligon</button>
+    <button id="undo" type="button">Undo titik</button>
+    <button id="close" type="button">Tutup poligon</button>
+    <button id="cancel" type="button">Batal</button>
+    <button id="save" type="button">Simpan titik</button>
+  </div>
+  <p id="status" class="note"></p>
+  <div class="stage" id="stage" hidden>
+    <img id="plan" alt="Denah yang diunggah">
+    <canvas id="draw"></canvas>
+  </div>
+  <div id="list"></div>
+  </div>
+  <div id="compare" hidden>
+    <p>Pilih dua berkas titik siluet yang sudah disimpan. Skornya kemiripan bentuk batas luar setelah ukuran disamakan dan denah diputar.</p>
+    <div class="row">
+      <label>Denah A <select id="fileA"></select></label>
+      <label>Denah B <select id="fileB"></select></label>
+      <button id="compareGo" type="button">Bandingkan siluet</button>
+    </div>
+    <p id="compareScore" class="note"></p>
+    <canvas id="overlay" width="520" height="520" style="background:#fff;border:1px solid #d5dde3;max-width:100%"></canvas>
+  </div>
+  <script>
+    const COLORS = ["#2e4c7a", "#a8462f", "#2f6a4a", "#6a4a86", "#8a6a2e", "#3d6d8a", "#8a3d4a"];
+    const fileInput = document.getElementById("file");
+    const status = document.getElementById("status");
+    const plan = document.getElementById("plan");
+    const canvas = document.getElementById("draw");
+    const ctx = canvas.getContext("2d");
+    const list = document.getElementById("list");
+    const sets = { ruang: [], siluet: [] };
+    let mode = "ruang";
+    let pending = null;
+    let imageName = "";
+    let drag = null;
+    let draft = null;
+    let cursor = null;
+
+    function active() { return sets[mode]; }
+    function imagePoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return [
+        (event.clientX - rect.left) * (canvas.width / rect.width),
+        (event.clientY - rect.top) * (canvas.height / rect.height)
+      ];
+    }
+    function strictlyInside(x, y, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const yi = poly[i][1], yj = poly[j][1];
+        if ((yi > y) === (yj > y)) continue;
+        const xCross = (poly[j][0] - poly[i][0]) * (y - yi) / ((yj - yi) || 1e-9) + poly[i][0];
+        if (x < xCross) inside = !inside;
+      }
+      return inside;
+    }
+    function crosses(a, b, c, d) {
+      function side(p, q, r) {
+        return (r[1] - p[1]) * (q[0] - p[0]) - (q[1] - p[1]) * (r[0] - p[0]);
+      }
+      return side(a, c, d) * side(b, c, d) < 0 && side(a, b, c) * side(a, b, d) < 0;
+    }
+    function hitsOthers(points, skip) {
+      return active().some((other, index) => {
+        if (index === skip || other.points.length < 3) return false;
+        if (points.some((p) => strictlyInside(p[0], p[1], other.points))) return true;
+        if (other.points.some((p) => strictlyInside(p[0], p[1], points))) return true;
+        for (let i = 0; i < points.length; i++) {
+          const a = points[i], b = points[(i + 1) % points.length];
+          for (let j = 0; j < other.points.length; j++) {
+            const c = other.points[j], d = other.points[(j + 1) % other.points.length];
+            if (crosses(a, b, c, d)) return true;
+          }
+        }
+        return false;
+      });
+    }
+    function drawPoly(pts, color, closed) {
+      if (pts.length < 2) return;
+      ctx.beginPath();
+      pts.forEach((p, i) => i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]));
+      if (closed) ctx.closePath();
+      if (closed) { ctx.fillStyle = color + "44"; ctx.fill(); }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      pts.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], 5, 0, Math.PI * 2);
+        ctx.fillStyle = "#1c2530";
+        ctx.fill();
+      });
+    }
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      active().forEach((room) => drawPoly(room.points, room.color, true));
+      if (draft) {
+        const shown = cursor ? draft.concat([cursor]) : draft;
+        drawPoly(shown, "#a8462f", false);
+        if (draft.length) {
+          ctx.beginPath();
+          ctx.arc(draft[0][0], draft[0][1], 14, 0, Math.PI * 2);
+          ctx.strokeStyle = "#a8462f";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
+    }
+    function nearestPoint(x, y) {
+      let best = null;
+      active().forEach((room, ri) => {
+        room.points.forEach((p, pi) => {
+          const d = Math.hypot(p[0] - x, p[1] - y);
+          if (d < 12 && (!best || d < best.d)) best = { d, ri, pi, p };
+        });
+      });
+      return best;
+    }
+    function nearestEdge(x, y) {
+      let best = null;
+      active().forEach((room, ri) => {
+        room.points.forEach((a, i) => {
+          const b = room.points[(i + 1) % room.points.length];
+          const abx = b[0] - a[0], aby = b[1] - a[1];
+          const len2 = abx * abx + aby * aby || 1;
+          let t = ((x - a[0]) * abx + (y - a[1]) * aby) / len2;
+          t = Math.max(0, Math.min(1, t));
+          const px = a[0] + abx * t, py = a[1] + aby * t;
+          const d = Math.hypot(px - x, py - y);
+          if (d < 10 && t > 0.08 && t < 0.92 && (!best || d < best.d)) best = { d, ri, i, x: px, y: py };
+        });
+      });
+      return best;
+    }
+    function renderList() {
+      list.innerHTML = "";
+      active().forEach((room, index) => {
+        const row = document.createElement("div");
+        row.className = "room";
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = room.color;
+        const input = document.createElement("input");
+        input.value = room.name;
+        input.placeholder = "Nama, kosongkan jika tidak ada di gambar";
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        const showTag = () => {
+          tag.textContent = room.source === "tulisan" ? "saran dari tulisan"
+            : (room.source === "terkaan" ? "terkaan" : (room.source === "diketik" ? "diketik" : ""));
+        };
+        showTag();
+        input.oninput = () => {
+          room.name = input.value;
+          room.source = input.value ? "diketik" : "kosong";
+          showTag();
+        };
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Hapus";
+        remove.onclick = () => { active().splice(index, 1); renderList(); draw(); };
+        row.append(swatch, input, tag, remove);
+        list.appendChild(row);
+      });
+    }
+    function setMode(next) {
+      mode = next;
+      draft = null;
+      document.getElementById("modeRuang").classList.toggle("active", mode === "ruang");
+      document.getElementById("modeSiluet").classList.toggle("active", mode === "siluet");
+      document.getElementById("modeBanding").classList.toggle("active", mode === "banding");
+      document.getElementById("editor").hidden = mode === "banding";
+      document.getElementById("compare").hidden = mode !== "banding";
+      if (mode === "banding") loadSiluetList();
+      renderList();
+      draw();
+    }
+    document.getElementById("modeRuang").onclick = () => setMode("ruang");
+    document.getElementById("modeSiluet").onclick = () => setMode("siluet");
+    document.getElementById("modeBanding").onclick = () => setMode("banding");
+
+    canvas.addEventListener("pointerdown", (event) => {
+      const [x, y] = imagePoint(event);
+      if (draft) {
+        if (draft.length >= 3 && Math.hypot(draft[0][0] - x, draft[0][1] - y) < 22) {
+          closeDraft();
+          return;
+        }
+        draft.push([x, y]);
+        draw();
+        return;
+      }
+      const hit = nearestPoint(x, y);
+      if (hit) {
+        drag = { ri: hit.ri, pi: hit.pi, previous: hit.p.slice() };
+        canvas.setPointerCapture(event.pointerId);
+        return;
+      }
+      const edge = nearestEdge(x, y);
+      if (!edge) return;
+      const room = active()[edge.ri];
+      const next = room.points.slice();
+      next.splice(edge.i + 1, 0, [edge.x, edge.y]);
+      if (hitsOthers(next, edge.ri)) {
+        status.textContent = "Titik baru itu menimpa poligon lain.";
+        return;
+      }
+      room.points = next;
+      drag = { ri: edge.ri, pi: edge.i + 1, previous: [edge.x, edge.y] };
+      canvas.setPointerCapture(event.pointerId);
+      draw();
+    });
+    function closeDraft() {
+      if (!draft || draft.length < 3) {
+        status.textContent = "Perlu sedikitnya tiga titik sebelum ditutup.";
+        return;
+      }
+      if (mode === "ruang" && hitsOthers(draft, -1)) {
+        status.textContent = "Poligon ini menimpa ruang lain. Geser titiknya atau tekan Batal.";
+        return;
+      }
+      const room = {
+        name: "",
+        source: "kosong",
+        points: draft,
+        color: mode === "siluet" ? "#a8462f" : COLORS[active().length % COLORS.length]
+      };
+      if (mode === "siluet") sets.siluet = [room];
+      else active().push(room);
+      draft = null;
+      cursor = null;
+      renderList();
+      draw();
+      const field = list.querySelector(".room:last-child input");
+      if (field) field.focus();
+      status.textContent = "Poligon tertutup. Isi namanya sendiri, atau biarkan kosong.";
+    }
+    canvas.addEventListener("pointermove", (event) => {
+      if (draft) {
+        cursor = imagePoint(event);
+        draw();
+        return;
+      }
+      if (!drag) return;
+      const point = imagePoint(event);
+      const room = active()[drag.ri];
+      const next = room.points.map((p, i) => i === drag.pi ? point : p.slice());
+      if (hitsOthers(next, drag.ri)) return;
+      room.points[drag.pi] = point;
+      draw();
+    });
+    canvas.addEventListener("pointerup", () => { drag = null; });
+    canvas.addEventListener("dblclick", (event) => {
+      if (draft) return;
+      const [x, y] = imagePoint(event);
+      const hit = nearestPoint(x, y);
+      if (!hit || active()[hit.ri].points.length <= 3) return;
+      active()[hit.ri].points.splice(hit.pi, 1);
+      draw();
+    });
+
+    async function show(blob) {
+      plan.src = URL.createObjectURL(blob);
+      await plan.decode();
+      canvas.width = plan.naturalWidth;
+      canvas.height = plan.naturalHeight;
+      document.getElementById("stage").hidden = false;
+      draw();
+    }
+    function resetSets() {
+      sets.ruang = [];
+      sets.siluet = [];
+      draft = null;
+      renderList();
+      draw();
+    }
+    async function saveActive() {
+      const response = await fetch("/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: imageName,
+          mode,
+          polygons: active().map((room, index) => ({
+            id: mode + "-" + (index + 1),
+            name: room.name,
+            name_source: room.source,
+            points: room.points
+          }))
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        status.textContent = data.error || "Gagal menyimpan.";
+        return;
+      }
+      status.textContent = "Titik " + mode + " tersimpan di hasil/" + data.saved;
+    }
+    document.getElementById("sample").onclick = async () => {
+      imageName = "Gambar3.jpeg";
+      pending = await (await fetch("/contoh/Gambar3.jpeg")).blob();
+      resetSets();
+      await show(pending);
+      status.textContent = "Contoh Gambar3 siap. Pilih mode, lalu Deteksi.";
+    };
+    fileInput.onchange = async () => {
+      pending = fileInput.files[0] || null;
+      imageName = pending ? pending.name : "";
+      resetSets();
+      if (pending) await show(pending);
+      status.textContent = imageName;
+    };
+    document.getElementById("go").onclick = async () => {
+      if (!pending) { status.textContent = "Pilih gambar dulu."; return; }
+      status.textContent = "Mendeteksi...";
+      draft = null;
+      await show(pending);
+      const response = await fetch("/segment?mode=" + mode, { method: "POST", body: pending });
+      const data = await response.json();
+      if (!response.ok) { status.textContent = data.error || "Gagal."; return; }
+      const made = data.rooms.filter((room) => room.points && room.points.length >= 3).map((room, i) => ({
+        name: room.name || "",
+        source: room.name ? room.source : "kosong",
+        points: room.points.map((p) => [p[0], p[1]]),
+        color: mode === "siluet" ? "#a8462f" : COLORS[i % COLORS.length]
+      }));
+      sets[mode] = mode === "siluet" ? made.slice(0, 1) : made;
+      renderList();
+      draw();
+      await saveActive();
+    };
+    document.getElementById("add").onclick = () => {
+      if (!plan.src) { status.textContent = "Pilih gambar dulu."; return; }
+      drag = null;
+      draft = [];
+      cursor = null;
+      draw();
+      status.textContent = "Klik untuk menambah titik. Undo menghapus titik terakhir. Tutup, atau klik lingkaran di titik pertama.";
+    };
+    document.getElementById("undo").onclick = () => {
+      if (!draft || !draft.length) return;
+      draft.pop();
+      draw();
+    };
+    document.getElementById("close").onclick = () => closeDraft();
+    document.getElementById("cancel").onclick = () => {
+      draft = null;
+      cursor = null;
+      draw();
+      status.textContent = "Gambar dibatalkan.";
+    };
+    document.getElementById("save").onclick = () => saveActive();
+
+    function normalize(pts) {
+      const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+      const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+      const shifted = pts.map((p) => [p[0] - cx, p[1] - cy]);
+      const scale = Math.max(...shifted.map((p) => Math.hypot(p[0], p[1]))) || 1;
+      return shifted.map((p) => [p[0] / scale, p[1] / scale]);
+    }
+    function rotate(pts, angle) {
+      const c = Math.cos(angle), s = Math.sin(angle);
+      return pts.map((p) => [p[0] * c - p[1] * s, p[0] * s + p[1] * c]);
+    }
+    function insidePoly(x, y, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const yi = poly[i][1], yj = poly[j][1];
+        if ((yi > y) === (yj > y)) continue;
+        const xCross = (poly[j][0] - poly[i][0]) * (y - yi) / ((yj - yi) || 1e-9) + poly[i][0];
+        if (x < xCross) inside = !inside;
+      }
+      return inside;
+    }
+    function overlapGrid(a, b, grid) {
+      let both = 0, either = 0;
+      for (let i = 0; i < grid; i++) {
+        for (let j = 0; j < grid; j++) {
+          const x = -1.2 + 2.4 * (i + 0.5) / grid;
+          const y = -1.2 + 2.4 * (j + 0.5) / grid;
+          const ia = insidePoly(x, y, a), ib = insidePoly(x, y, b);
+          if (ia && ib) both++;
+          if (ia || ib) either++;
+        }
+      }
+      return either ? both / either : 0;
+    }
+    function bestOverlap(a, b) {
+      let best = -1, angle = 0, poly = b;
+      for (let k = 0; k < 24; k++) {
+        const ang = (2 * Math.PI * k) / 24;
+        const turned = rotate(b, ang);
+        const score = overlapGrid(a, turned, 48);
+        if (score > best) { best = score; angle = ang; poly = turned; }
+      }
+      return { overlap: overlapGrid(a, poly, 120), angleDeg: angle * 180 / Math.PI, poly };
+    }
+    function paintOverlay(a, b) {
+      const canvas = document.getElementById("overlay");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      function stroke(pts, color) {
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const x = 260 + p[0] * 200, y = 260 + p[1] * 200;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        });
+        ctx.closePath();
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      stroke(a, "#2e4c7a");
+      stroke(b, "#a8462f");
+    }
+    async function loadSiluetList() {
+      const names = await (await fetch("/hasil")).json();
+      for (const id of ["fileA", "fileB"]) {
+        const select = document.getElementById(id);
+        const previous = select.value;
+        select.innerHTML = "";
+        names.forEach((name) => {
+          const option = document.createElement("option");
+          option.value = name;
+          option.textContent = name;
+          select.appendChild(option);
+        });
+        if (previous) select.value = previous;
+      }
+      if (names.length > 1) document.getElementById("fileB").selectedIndex = 1;
+    }
+    async function siluetPoints(name) {
+      const data = await (await fetch("/hasil/" + encodeURIComponent(name))).json();
+      const poly = (data.polygons || [])[0];
+      if (!poly || !poly.points || poly.points.length < 3) throw new Error("Berkas " + name + " belum berisi siluet.");
+      return poly.points;
+    }
+    document.getElementById("compareGo").onclick = async () => {
+      const aName = document.getElementById("fileA").value;
+      const bName = document.getElementById("fileB").value;
+      const note = document.getElementById("compareScore");
+      if (!aName || !bName) {
+        note.textContent = "Simpan siluet kedua denah dulu, lewat mode siluet.";
+        return;
+      }
+      note.textContent = "Membandingkan...";
+      try {
+        const a = normalize(await siluetPoints(aName));
+        const b = normalize(await siluetPoints(bName));
+        const found = bestOverlap(a, b);
+        note.textContent = "Kemiripan siluet " + (found.overlap * 100).toFixed(1) + "% pada putaran " + found.angleDeg.toFixed(0) + "°. Ini kemiripan batas luar, bukan susunan ruang.";
+        paintOverlay(a, found.poly);
+      } catch (error) {
+        note.textContent = error.message;
+      }
+    };
+  </script>
+</body>
+</html>
